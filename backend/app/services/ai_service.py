@@ -1,0 +1,82 @@
+from langchain_openai import ChatOpenAI
+from langchain.output_parsers import PydanticOutputParser
+from langchain.prompts import PromptTemplate
+from app.config import settings
+from app.schemas.plan import WeeklyPlanAI, UserProfileData
+import logging
+
+logger = logging.getLogger(__name__)
+
+class AIWorkoutPlanner:
+    """Service for generating workout plans using AI"""
+
+    def __init__(self):
+        self.llm = ChatOpenAI(
+            model="gpt-4-turbo-preview",
+            temperature=0.7,
+            openai_api_key=settings.OPENAI_API_KEY
+        )
+        self.parser = PydanticOutputParser(pydantic_object=WeeklyPlanAI)
+
+    async def generate_plan(self, user_data: UserProfileData) -> WeeklyPlanAI:
+        """Generate a personalized 7-day workout plan"""
+        
+        prompt_template = """
+        Ты - экспертный фитнес-тренер, специализирующийся на тренировках с собственным весом, которые можно отслеживать с помощью компьютерного зрения.
+        Твоя задача - создать персонализированный план тренировок на 7 дней для пользователя со следующими параметрами:
+        - Возраст: {age} лет
+        - Вес: {weight} кг
+        - Рост: {height} см
+        - Цель: {goal}
+        - Уровень: {level}
+        
+        ВАЖНЫЕ ОГРАНИЧЕНИЯ:
+        1. Используй ТОЛЬКО эти типы упражнений: "Приседания", "Выпады", "Отжимания", "Планка". Это связано с тем, что наше приложение отслеживает только их через камеру.
+        2. План должен быть на 7 дней.
+        3. Для "Планка" указывай `duration` (секунды) и `reps=None`.
+        4. Для остальных упражнений указывай `reps` и `duration=None`.
+        5. Объясняй инструкции к упражнениям на РУССКОМ языке.
+        6. Сделай план прогрессивным и мотивирующим.
+        
+        {format_instructions}
+        """
+
+        prompt = PromptTemplate(
+            template=prompt_template,
+            input_variables=["age", "weight", "height", "goal", "level"],
+            partial_variables={"format_instructions": self.parser.get_format_instructions()},
+        )
+
+        # Mapping goals and levels to Russian for better context if they are in English
+        goal_map = {
+            "lose_weight": "Похудение",
+            "get_toned": "Приведение мышц в тонус",
+            "improve_shape": "Улучшение общей физической формы"
+        }
+        level_map = {
+            "beginner": "Новичок",
+            "intermediate": "Средний",
+            "advanced": "Продвинутый"
+        }
+
+        formatted_goal = goal_map.get(user_data.fitness_goal, user_data.fitness_goal)
+        formatted_level = level_map.get(user_data.fitness_level, user_data.fitness_level)
+
+        input_data = {
+            "age": user_data.age,
+            "weight": user_data.weight,
+            "height": user_data.height,
+            "goal": formatted_goal,
+            "level": formatted_level
+        }
+
+        try:
+            _input = prompt.format_prompt(**input_data)
+            output = await self.llm.ainvoke(_input.to_string())
+            return self.parser.parse(output.content)
+        except Exception as e:
+            logger.error(f"AI Plan Generation failed: {e}")
+            # Fallback to a basic plan or raise
+            raise e
+
+ai_planner = AIWorkoutPlanner()

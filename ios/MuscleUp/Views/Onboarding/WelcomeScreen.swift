@@ -67,15 +67,27 @@ struct WelcomeScreen: View {
 
                 Spacer()
 
-                // CTA Button
-                Button(action: onContinue) {
-                    HStack(spacing: Spacing.sm) {
-                        Text("Начать")
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 16, weight: .semibold))
+                // CTA Section
+                VStack(spacing: Spacing.md) {
+                    SocialLoginButtons { provider in
+                        // Simulate OAuth login
+                        Task {
+                            // In real app, trigger Google/Apple SDK
+                            // let idToken = ...
+                            // try await AuthManager.shared.loginWithOAuth(provider: provider, idToken: idToken)
+                            
+                            // For now, just skip to goals
+                            DispatchQueue.main.async {
+                                onContinue()
+                            }
+                        }
                     }
+                    
+                    Text("Продолжая, вы соглашаетесь с условиями использования")
+                        .font(.muscleUpCaption)
+                        .foregroundColor(.muscleUpTextTertiary)
+                        .padding(.top, Spacing.sm)
                 }
-                .buttonStyle(PrimaryButtonStyle())
                 .padding(.horizontal, Spacing.lg)
                 .offset(y: animateButton ? 0 : 30)
                 .opacity(animateButton ? 1.0 : 0)
