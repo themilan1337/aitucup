@@ -43,19 +43,12 @@ const handleViewPlan = () => {
       </p>
     </div>
     
-    <div class="mt-8 space-y-4">
+    <div class="space-y-4">
       <PrimaryButton 
-        icon="hugeicons:play"
         @click="handleStartWorkout"
       >
         Начать тренировку
       </PrimaryButton>
-      
-      <SecondaryButton 
-        @click="handleViewPlan"
-      >
-        Посмотреть план
-      </SecondaryButton>
     </div>
   </FullScreenContainer>
 </template>
