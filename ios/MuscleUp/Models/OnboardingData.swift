@@ -119,16 +119,57 @@ class OnboardingState: ObservableObject {
 
     func generatePlan(completion: @escaping () -> Void) {
         isGeneratingPlan = true
-        // Simulate plan generation
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-            self.isGeneratingPlan = false
-            completion()
+        
+        Task {
+            do {
+                // 1. Update user profile on backend
+                let profileUpdate = ProfileUpdateRequest(
+                    age: Int(age) ?? 0,
+                    weight: Double(weight) ?? 0,
+                    height: Int(height) ?? 0,
+                    fitness_goal: selectedGoal?.rawValue ?? "",
+                    fitness_level: selectedLevel?.rawValue ?? ""
+                )
+                
+                let _: UserProfileResponse = try await APIClient.shared.request("users/profile", method: "PATCH", body: profileUpdate)
+                
+                // 2. Generate weekly plan using AI
+                let _: PlanGenerationResponse = try await APIClient.shared.request("plans/generate", method: "POST")
+                
+                DispatchQueue.main.async {
+                    self.isGeneratingPlan = false
+                    completion()
+                }
+            } catch {
+                print("Failed to generate plan: \(error)")
+                DispatchQueue.main.async {
+                    self.isGeneratingPlan = false
+                    // Fallback to completion for demo purposes or show error
+                    completion()
+                }
+            }
         }
     }
 
     func completeOnboarding() {
         hasCompletedOnboarding = true
-        // Save to UserDefaults or persistence layer
         UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
     }
+}
+
+struct ProfileUpdateRequest: Encodable {
+    let age: Int
+    let weight: Double
+    let height: Int
+    let fitness_goal: String
+    let fitness_level: String
+}
+
+struct UserProfileResponse: Decodable {
+    let id: String
+}
+
+struct PlanGenerationResponse: Decodable {
+    let status: String
+    let plan_id: String
 }
