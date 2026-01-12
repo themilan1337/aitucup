@@ -71,7 +71,7 @@ const startPreparing = () => {
 
 const handleSuccessContinue = () => {
   store.completeOnboarding()
-  router.push('/dashboard')
+  router.push('/home')
 }
 
 // Confetti Effect
