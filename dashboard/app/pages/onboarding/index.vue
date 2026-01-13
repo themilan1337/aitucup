@@ -148,6 +148,39 @@ const isPhysicalParamsValid = computed(() => {
          localWeight.value > 0 &&
          localAge.value > 0
 })
+
+// Helper functions for incrementing/decrementing values
+const incrementValue = (field: 'height' | 'weight' | 'age') => {
+  const limits = {
+    height: { max: 250, step: 1 },
+    weight: { max: 200, step: 1 },
+    age: { max: 100, step: 1 }
+  }
+
+  if (field === 'height') {
+    localHeight.value = Math.min((localHeight.value || 0) + limits.height.step, limits.height.max)
+  } else if (field === 'weight') {
+    localWeight.value = Math.min((localWeight.value || 0) + limits.weight.step, limits.weight.max)
+  } else if (field === 'age') {
+    localAge.value = Math.min((localAge.value || 0) + limits.age.step, limits.age.max)
+  }
+}
+
+const decrementValue = (field: 'height' | 'weight' | 'age') => {
+  const limits = {
+    height: { min: 100, step: 1 },
+    weight: { min: 30, step: 1 },
+    age: { min: 10, step: 1 }
+  }
+
+  if (field === 'height') {
+    localHeight.value = Math.max((localHeight.value || 0) - limits.height.step, limits.height.min)
+  } else if (field === 'weight') {
+    localWeight.value = Math.max((localWeight.value || 0) - limits.weight.step, limits.weight.min)
+  } else if (field === 'age') {
+    localAge.value = Math.max((localAge.value || 0) - limits.age.step, limits.age.min)
+  }
+}
 </script>
 
 <template>
@@ -274,55 +307,100 @@ const isPhysicalParamsValid = computed(() => {
             <h1 class="text-3xl font-bold mb-2">Ваши параметры</h1>
             <p class="text-gray-400 mb-8">Для точного подбора нагрузки и калорий</p>
 
-            <div class="space-y-6">
+            <div class="space-y-4">
               <!-- Height -->
-              <div class="bg-[#1A1A1A] rounded-2xl p-5">
-                <label class="block text-sm text-gray-400 mb-3">Рост (см)</label>
-                <div class="flex items-center gap-3">
-                  <Icon icon="hugeicons:arrow-up-down" class="text-[#CCFF00] text-xl" />
+              <div class="bg-[#1A1A1A] rounded-2xl p-4">
+                <label class="block text-xs text-gray-400 mb-2">Рост (см)</label>
+                <div class="flex items-stretch gap-2">
+                  <Icon icon="hugeicons:arrow-up-down" class="text-[#CCFF00] text-xl shrink-0 self-center" />
                   <input
                     v-model.number="localHeight"
                     type="number"
                     placeholder="170"
-                    class="flex-1 bg-transparent text-white text-2xl font-bold outline-none"
+                    class="flex-1 bg-transparent text-white text-3xl font-bold outline-none hide-arrows"
                     min="100"
                     max="250"
                   />
-                  <span class="text-gray-500 text-sm">см</span>
+                  <div class="flex gap-1 shrink-0">
+                    <button
+                      @click="incrementValue('height')"
+                      class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
+                      type="button"
+                    >
+                      <Icon icon="hugeicons:arrow-up-01" class="text-[#CCFF00] text-2xl" />
+                    </button>
+                    <button
+                      @click="decrementValue('height')"
+                      class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
+                      type="button"
+                    >
+                      <Icon icon="hugeicons:arrow-down-01" class="text-[#CCFF00] text-2xl" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <!-- Weight -->
-              <div class="bg-[#1A1A1A] rounded-2xl p-5">
-                <label class="block text-sm text-gray-400 mb-3">Вес (кг)</label>
-                <div class="flex items-center gap-3">
-                  <Icon icon="hugeicons:scale" class="text-[#CCFF00] text-xl" />
+              <div class="bg-[#1A1A1A] rounded-2xl p-4">
+                <label class="block text-xs text-gray-400 mb-2">Вес (кг)</label>
+                <div class="flex items-stretch gap-2">
+                  <Icon icon="hugeicons:scale" class="text-[#CCFF00] text-xl shrink-0 self-center" />
                   <input
                     v-model.number="localWeight"
                     type="number"
                     placeholder="70"
-                    class="flex-1 bg-transparent text-white text-2xl font-bold outline-none"
+                    class="flex-1 bg-transparent text-white text-3xl font-bold outline-none hide-arrows"
                     min="30"
                     max="200"
                   />
-                  <span class="text-gray-500 text-sm">кг</span>
+                  <div class="flex gap-1 shrink-0">
+                    <button
+                      @click="incrementValue('weight')"
+                      class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
+                      type="button"
+                    >
+                      <Icon icon="hugeicons:arrow-up-01" class="text-[#CCFF00] text-2xl" />
+                    </button>
+                    <button
+                      @click="decrementValue('weight')"
+                      class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
+                      type="button"
+                    >
+                      <Icon icon="hugeicons:arrow-down-01" class="text-[#CCFF00] text-2xl" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <!-- Age -->
-              <div class="bg-[#1A1A1A] rounded-2xl p-5">
-                <label class="block text-sm text-gray-400 mb-3">Возраст (лет)</label>
-                <div class="flex items-center gap-3">
-                  <Icon icon="hugeicons:calendar-01" class="text-[#CCFF00] text-xl" />
+              <div class="bg-[#1A1A1A] rounded-2xl p-4">
+                <label class="block text-xs text-gray-400 mb-2">Возраст (лет)</label>
+                <div class="flex items-stretch gap-2">
+                  <Icon icon="hugeicons:calendar-01" class="text-[#CCFF00] text-xl shrink-0 self-center" />
                   <input
                     v-model.number="localAge"
                     type="number"
                     placeholder="25"
-                    class="flex-1 bg-transparent text-white text-2xl font-bold outline-none"
+                    class="flex-1 bg-transparent text-white text-3xl font-bold outline-none hide-arrows"
                     min="10"
                     max="100"
                   />
-                  <span class="text-gray-500 text-sm">лет</span>
+                  <div class="flex gap-1 shrink-0">
+                    <button
+                      @click="incrementValue('age')"
+                      class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
+                      type="button"
+                    >
+                      <Icon icon="hugeicons:arrow-up-01" class="text-[#CCFF00] text-2xl" />
+                    </button>
+                    <button
+                      @click="decrementValue('age')"
+                      class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
+                      type="button"
+                    >
+                      <Icon icon="hugeicons:arrow-down-01" class="text-[#CCFF00] text-2xl" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -419,5 +497,17 @@ const isPhysicalParamsValid = computed(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Hide default number input arrows */
+.hide-arrows::-webkit-outer-spin-button,
+.hide-arrows::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.hide-arrows[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 </style>
