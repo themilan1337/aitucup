@@ -43,7 +43,6 @@ const recordsList = [
         <!-- Workouts -->
         <div class="bg-card p-4 rounded-2xl bg-[#111]">
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
-              <Icon icon="heroicons:view-columns" class="text-neon" />
               <span>Тренировок</span>
            </div>
            <p class="text-3xl font-bold">{{ store.lifetimeStats.totalWorkouts }}</p>
@@ -52,7 +51,6 @@ const recordsList = [
         <!-- Reps -->
         <div class="bg-card p-4 rounded-2xl bg-[#111]">
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
-              <Icon icon="heroicons:arrow-trending-up" class="text-neon" />
               <span>Повторений</span>
            </div>
            <p class="text-3xl font-bold">{{ store.lifetimeStats.totalReps }}</p>
@@ -61,7 +59,6 @@ const recordsList = [
         <!-- Time -->
         <div class="bg-card p-4 rounded-2xl bg-[#111]">
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
-              <Icon icon="heroicons:clock" class="text-blue-500" />
               <span>Время</span>
            </div>
            <p class="text-3xl font-bold">{{ store.weeklyStats.minutes }} <span class="text-lg font-normal text-gray-500">мин</span></p>
@@ -70,7 +67,6 @@ const recordsList = [
         <!-- Calories -->
         <div class="bg-card p-4 rounded-2xl bg-[#111]">
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
-              <Icon icon="heroicons:fire" class="text-orange-500" />
               <span>Калорий</span>
            </div>
            <p class="text-3xl font-bold">{{ store.weeklyStats.calories }} <span class="text-lg font-normal text-gray-500">ккал</span></p>
@@ -79,7 +75,6 @@ const recordsList = [
         <!-- Accuracy -->
         <div class="bg-card p-4 rounded-2xl bg-[#111]">
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
-              <Icon icon="heroicons:check-badge" class="text-green-500" />
               <span>Точность формы</span>
            </div>
            <p class="text-3xl font-bold">{{ store.lifetimeStats.avgAccuracy }}<span class="text-lg font-normal text-gray-500">%</span></p>
@@ -88,7 +83,6 @@ const recordsList = [
           <!-- Weight -->
         <div class="bg-card p-4 rounded-2xl bg-[#111]">
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
-              <Icon icon="heroicons:scale" class="text-purple-500" />
               <span>Вес</span>
            </div>
            <p class="text-3xl font-bold">70.0 <span class="text-lg font-normal text-gray-500">кг</span></p>
