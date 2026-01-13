@@ -65,9 +65,12 @@ const muscleGroupTarget = "Ноги"
            </div>
 
            <!-- CTA -->
-           <button class="w-full py-4 rounded-xl bg-neon text-black font-bold text-lg flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all">
+           <router-link
+             to="/train"
+             class="w-full py-4 rounded-xl bg-neon text-black font-bold text-lg flex items-center justify-center gap-2 hover:brightness-110 active:scale-[0.98] transition-all"
+           >
               Начать тренировку
-           </button>
+           </router-link>
         </div>
      </div>
 
