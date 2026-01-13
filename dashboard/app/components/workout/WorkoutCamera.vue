@@ -229,14 +229,6 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- AI Detection Overlay -->
-      <div
-        v-if="isCameraReady && !showingResults && isDetectingMovement"
-        class="absolute inset-0 pointer-events-none"
-      >
-        <!-- Subtle detection indicator -->
-        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-neon rounded-full animate-ping" />
-      </div>
 
       <!-- Top Controls -->
       <div class="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent">
@@ -254,9 +246,9 @@ onUnmounted(() => {
               {{ elapsedTime }}
             </div>
 
-            <!-- Progress -->
-            <div class="px-4 py-2 rounded-full bg-black/50 backdrop-blur text-white font-bold">
-              {{ progress }}%
+            <!-- Set Progress -->
+            <div v-if="!isResting && currentExercise" class="px-4 py-2 rounded-full bg-black/50 backdrop-blur text-white font-bold text-sm">
+              Подход {{ currentSet }} из {{ currentExercise.sets }}
             </div>
           </div>
         </div>
@@ -281,20 +273,7 @@ onUnmounted(() => {
 
         <!-- Exercise Mode -->
         <div v-else>
-          <!-- Exercise Progress Indicator -->
-          <div class="flex items-center gap-2 mb-6">
-            <div
-              v-for="(ex, idx) in exercises"
-              :key="ex.id"
-              class="flex-1 h-1 rounded-full transition-all"
-              :class="idx < currentExerciseIndex ? 'bg-neon' : idx === currentExerciseIndex ? 'bg-neon/50' : 'bg-white/20'"
-            />
-          </div>
-
           <div class="text-center">
-            <p class="text-gray-400 text-xs mb-2">
-              Подход {{ currentSet }} из {{ currentExercise.sets }}
-            </p>
             <h2 class="text-2xl font-bold text-white mb-4">{{ currentExercise.name }}</h2>
 
             <!-- Rep Counter -->
