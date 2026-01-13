@@ -231,14 +231,11 @@ onUnmounted(() => {
 
       <!-- AI Detection Overlay -->
       <div
-        v-if="isCameraReady && !showingResults"
+        v-if="isCameraReady && !showingResults && isDetectingMovement"
         class="absolute inset-0 pointer-events-none"
       >
-        <!-- Skeleton/Pose dots simulation -->
-        <div
-          v-if="isDetectingMovement"
-          class="absolute inset-0 border-4 border-neon/50 rounded-3xl m-4 animate-pulse"
-        />
+        <!-- Subtle detection indicator -->
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-neon rounded-full animate-ping" />
       </div>
 
       <!-- Top Controls -->
@@ -268,15 +265,15 @@ onUnmounted(() => {
       <!-- Exercise Info -->
       <div
         v-if="!showingResults && currentExercise"
-        class="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/80 to-transparent"
+        class="absolute bottom-0 left-0 right-0 px-6 pt-8 pb-28 bg-gradient-to-t from-black via-black to-transparent"
       >
         <!-- Rest Mode -->
-        <div v-if="isResting" class="text-center mb-6">
-          <h2 class="text-3xl font-bold text-neon mb-2">Отдых</h2>
-          <div class="text-6xl font-bold text-white mb-4">{{ restTimeLeft }}s</div>
+        <div v-if="isResting" class="text-center">
+          <h2 class="text-2xl font-bold text-neon mb-3">Отдых</h2>
+          <div class="text-7xl font-bold text-white mb-6 leading-none">{{ restTimeLeft }}<span class="text-4xl">s</span></div>
           <button
             @click="skipRest"
-            class="px-6 py-3 bg-white/10 backdrop-blur text-white rounded-xl font-bold"
+            class="px-8 py-3 bg-white/10 backdrop-blur text-white rounded-xl font-bold text-base"
           >
             Пропустить отдых
           </button>
@@ -284,37 +281,37 @@ onUnmounted(() => {
 
         <!-- Exercise Mode -->
         <div v-else>
-          <div class="text-center mb-6">
-            <p class="text-gray-400 text-sm mb-1">
-              Подход {{ currentSet }} из {{ currentExercise.sets }}
-            </p>
-            <h2 class="text-3xl font-bold text-white mb-2">{{ currentExercise.name }}</h2>
-
-            <!-- Rep Counter -->
-            <div class="text-6xl font-bold text-neon mb-2">
-              {{ currentReps }} / {{ currentExercise.reps }}
-            </div>
-
-            <!-- Form Quality -->
-            <div class="flex items-center justify-center gap-2 text-sm">
-              <div class="w-32 h-2 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-neon transition-all duration-300"
-                  :style="{ width: `${formQuality}%` }"
-                />
-              </div>
-              <span class="text-gray-400">Форма: {{ formQuality }}%</span>
-            </div>
-          </div>
-
-          <!-- Exercise Progress -->
-          <div class="flex items-center gap-2 mb-4">
+          <!-- Exercise Progress Indicator -->
+          <div class="flex items-center gap-2 mb-6">
             <div
               v-for="(ex, idx) in exercises"
               :key="ex.id"
               class="flex-1 h-1 rounded-full transition-all"
               :class="idx < currentExerciseIndex ? 'bg-neon' : idx === currentExerciseIndex ? 'bg-neon/50' : 'bg-white/20'"
             />
+          </div>
+
+          <div class="text-center">
+            <p class="text-gray-400 text-xs mb-2">
+              Подход {{ currentSet }} из {{ currentExercise.sets }}
+            </p>
+            <h2 class="text-2xl font-bold text-white mb-4">{{ currentExercise.name }}</h2>
+
+            <!-- Rep Counter -->
+            <div class="text-7xl font-bold mb-4 leading-none">
+              <span class="text-neon">{{ currentReps }}</span> <span class="text-white/40 text-5xl">/</span> <span class="text-white">{{ currentExercise.reps }}</span>
+            </div>
+
+            <!-- Form Quality -->
+            <div class="flex items-center justify-center gap-3">
+              <div class="w-40 h-2 bg-white/10 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-neon transition-all duration-300"
+                  :style="{ width: `${formQuality}%` }"
+                />
+              </div>
+              <span class="text-gray-400 text-sm font-medium">Форма: {{ formQuality }}%</span>
+            </div>
           </div>
         </div>
       </div>
@@ -399,5 +396,16 @@ onUnmounted(() => {
 
 .animate-pulse {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes ping {
+  75%, 100% {
+    transform: translate(-50%, -50%) scale(2);
+    opacity: 0;
+  }
+}
+
+.animate-ping {
+  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 </style>
