@@ -8,11 +8,11 @@ const route = useRoute()
 const isActive = (path: string) => route.path === path || (path !== '/' && route.path.startsWith(path))
 
 const navItems = [
-  { name: 'Главная', path: '/home', icon: 'heroicons:home' },
-  { name: 'Прогресс', path: '/progress', icon: 'heroicons:chart-bar' },
-  { name: 'Тренировка', path: '/train', icon: 'heroicons:bolt', isCenter: true },
-  { name: 'План', path: '/plan', icon: 'heroicons:calendar' },
-  { name: 'Профиль', path: '/profile', icon: 'heroicons:user' },
+  { name: 'Главная', path: '/home', icon: 'hugeicons:home-01' },
+  { name: 'Прогресс', path: '/progress', icon: 'hugeicons:chart-03' },
+  { name: 'Тренировка', path: '/train', icon: 'hugeicons:flash', isCenter: true },
+  { name: 'План', path: '/plan', icon: 'hugeicons:calendar-04' },
+  { name: 'Профиль', path: '/profile', icon: 'hugeicons:user' },
 ]
 </script>
 
