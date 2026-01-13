@@ -181,6 +181,49 @@ const decrementValue = (field: 'height' | 'weight' | 'age') => {
     localAge.value = Math.max((localAge.value || 0) - limits.age.step, limits.age.min)
   }
 }
+
+// Long press functionality
+let longPressTimer: NodeJS.Timeout | null = null
+let rapidChangeInterval: NodeJS.Timeout | null = null
+
+const startLongPress = (field: 'height' | 'weight' | 'age', direction: 'increment' | 'decrement') => {
+  // First immediate change
+  if (direction === 'increment') {
+    incrementValue(field)
+  } else {
+    decrementValue(field)
+  }
+
+  // Clear any existing timers
+  clearLongPress()
+
+  // After 500ms, start rapid changes
+  longPressTimer = setTimeout(() => {
+    rapidChangeInterval = setInterval(() => {
+      if (direction === 'increment') {
+        incrementValue(field)
+      } else {
+        decrementValue(field)
+      }
+    }, 50) // Change every 50ms for smooth fast increment
+  }, 500)
+}
+
+const clearLongPress = () => {
+  if (longPressTimer) {
+    clearTimeout(longPressTimer)
+    longPressTimer = null
+  }
+  if (rapidChangeInterval) {
+    clearInterval(rapidChangeInterval)
+    rapidChangeInterval = null
+  }
+}
+
+// Cleanup on component unmount
+onUnmounted(() => {
+  clearLongPress()
+})
 </script>
 
 <template>
@@ -323,14 +366,24 @@ const decrementValue = (field: 'height' | 'weight' | 'age') => {
                   />
                   <div class="flex gap-1 shrink-0">
                     <button
-                      @click="incrementValue('height')"
+                      @mousedown="startLongPress('height', 'increment')"
+                      @mouseup="clearLongPress"
+                      @mouseleave="clearLongPress"
+                      @touchstart="startLongPress('height', 'increment')"
+                      @touchend="clearLongPress"
+                      @touchcancel="clearLongPress"
                       class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
                       type="button"
                     >
                       <Icon icon="hugeicons:arrow-up-01" class="text-[#CCFF00] text-2xl" />
                     </button>
                     <button
-                      @click="decrementValue('height')"
+                      @mousedown="startLongPress('height', 'decrement')"
+                      @mouseup="clearLongPress"
+                      @mouseleave="clearLongPress"
+                      @touchstart="startLongPress('height', 'decrement')"
+                      @touchend="clearLongPress"
+                      @touchcancel="clearLongPress"
                       class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
                       type="button"
                     >
@@ -355,14 +408,24 @@ const decrementValue = (field: 'height' | 'weight' | 'age') => {
                   />
                   <div class="flex gap-1 shrink-0">
                     <button
-                      @click="incrementValue('weight')"
+                      @mousedown="startLongPress('weight', 'increment')"
+                      @mouseup="clearLongPress"
+                      @mouseleave="clearLongPress"
+                      @touchstart="startLongPress('weight', 'increment')"
+                      @touchend="clearLongPress"
+                      @touchcancel="clearLongPress"
                       class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
                       type="button"
                     >
                       <Icon icon="hugeicons:arrow-up-01" class="text-[#CCFF00] text-2xl" />
                     </button>
                     <button
-                      @click="decrementValue('weight')"
+                      @mousedown="startLongPress('weight', 'decrement')"
+                      @mouseup="clearLongPress"
+                      @mouseleave="clearLongPress"
+                      @touchstart="startLongPress('weight', 'decrement')"
+                      @touchend="clearLongPress"
+                      @touchcancel="clearLongPress"
                       class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
                       type="button"
                     >
@@ -387,14 +450,24 @@ const decrementValue = (field: 'height' | 'weight' | 'age') => {
                   />
                   <div class="flex gap-1 shrink-0">
                     <button
-                      @click="incrementValue('age')"
+                      @mousedown="startLongPress('age', 'increment')"
+                      @mouseup="clearLongPress"
+                      @mouseleave="clearLongPress"
+                      @touchstart="startLongPress('age', 'increment')"
+                      @touchend="clearLongPress"
+                      @touchcancel="clearLongPress"
                       class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
                       type="button"
                     >
                       <Icon icon="hugeicons:arrow-up-01" class="text-[#CCFF00] text-2xl" />
                     </button>
                     <button
-                      @click="decrementValue('age')"
+                      @mousedown="startLongPress('age', 'decrement')"
+                      @mouseup="clearLongPress"
+                      @mouseleave="clearLongPress"
+                      @touchstart="startLongPress('age', 'decrement')"
+                      @touchend="clearLongPress"
+                      @touchcancel="clearLongPress"
                       class="w-12 h-full bg-[#111] hover:bg-[#222] rounded-xl flex items-center justify-center transition-colors active:scale-95"
                       type="button"
                     >
