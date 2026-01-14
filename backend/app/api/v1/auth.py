@@ -55,9 +55,13 @@ async def oauth_login(
     if not user_info:
         raise HTTPException(status_code=401, detail="Invalid OAuth token")
 
-    # Check if user exists
+    # Check if user exists (with profile)
+    from sqlalchemy.orm import selectinload
+
     result = await db.execute(
-        select(User).filter(User.oauth_id == user_info["oauth_id"])
+        select(User)
+        .options(selectinload(User.profile))
+        .filter(User.oauth_id == user_info["oauth_id"])
     )
     user = result.scalars().first()
 
@@ -78,6 +82,15 @@ async def oauth_login(
         profile = UserProfile(user_id=user.id)
         db.add(profile)
         await db.commit()
+
+        # Refresh user with profile relationship loaded
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.profile))
+            .filter(User.id == user.id)
+        )
+        user = result.scalars().first()
+
         logger.info(f"New user registered: {user.email}")
 
     # Generate tokens with JTI for refresh token
@@ -143,8 +156,14 @@ async def refresh_token(
             detail="Refresh token has been revoked"
         )
 
-    # Verify user still exists
-    result = await db.execute(select(User).filter(User.id == user_id))
+    # Verify user still exists (with profile)
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.profile))
+        .filter(User.id == user_id)
+    )
     user = result.scalars().first()
     if not user:
         raise HTTPException(

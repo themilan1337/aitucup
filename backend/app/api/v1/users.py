@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.api.deps import get_current_user
 from app.models.user import User, UserProfile
+from app.schemas.auth import UserResponse
 from pydantic import BaseModel
 from typing import Optional
 
@@ -29,7 +31,7 @@ async def get_profile(
     profile = result.scalars().first()
     return profile
 
-@router.patch("/profile")
+@router.patch("/profile", response_model=UserResponse)
 async def update_profile(
     update_data: ProfileUpdate,
     db: AsyncSession = Depends(get_db),
@@ -40,14 +42,22 @@ async def update_profile(
         select(UserProfile).filter(UserProfile.user_id == current_user.id)
     )
     profile = result.scalars().first()
-    
+
     if not profile:
         profile = UserProfile(user_id=current_user.id)
         db.add(profile)
-    
+
     for field, value in update_data.model_dump(exclude_unset=True).items():
         setattr(profile, field, value)
-        
+
     await db.commit()
     await db.refresh(profile)
-    return profile
+
+    # Return full user with updated profile
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.profile))
+        .filter(User.id == current_user.id)
+    )
+    user = result.scalars().first()
+    return user

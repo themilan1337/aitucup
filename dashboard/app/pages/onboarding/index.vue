@@ -6,8 +6,10 @@ import OnboardingStepHeader from '~/components/ui/OnboardingStepHeader.vue'
 import SelectableCard from '~/components/ui/SelectableCard.vue'
 import PrimaryButton from '~/components/ui/PrimaryButton.vue'
 import { useOnboardingStore } from '~/stores/onboarding'
+import { useAuthStore } from '~/stores/auth'
 
 const store = useOnboardingStore()
+const authStore = useAuthStore()
 const router = useRouter()
 
 // Steps definition
@@ -105,9 +107,42 @@ const startPreparing = () => {
   }, 3000) // 3 seconds simulation
 }
 
-const handleSuccessContinue = () => {
-  store.completeOnboarding()
-  router.push('/home')
+const handleSuccessContinue = async () => {
+  isLoading.value = true
+
+  try {
+    // Get auth store to update profile
+    const authStore = useAuthStore()
+
+    // Prepare profile data from onboarding
+    const profileData = {
+      age: store.age,
+      weight: store.weight,
+      height: store.height,
+      fitness_goal: store.goal,
+      fitness_level: store.level,
+      // gender не сохраняется в UserProfile в текущей схеме backend
+    }
+
+    // Send data to backend
+    const success = await authStore.updateProfile(profileData)
+
+    if (!success) {
+      throw new Error('Failed to update profile')
+    }
+
+    // Mark onboarding as completed
+    store.completeOnboarding()
+
+    // Redirect to home
+    router.push('/home')
+  } catch (error: any) {
+    console.error('Failed to save onboarding data:', error)
+    // Show error to user (you can add error state if needed)
+    alert('Не удалось сохранить данные. Попробуйте снова.')
+  } finally {
+    isLoading.value = false
+  }
 }
 
 // Confetti Effect
@@ -555,10 +590,11 @@ onUnmounted(() => {
          <p class="text-gray-400 mb-12 max-w-xs mx-auto">Начните первую тренировку и отслеживайте прогресс каждый день.</p>
 
          <div class="w-full space-y-4 max-w-md mx-auto px-4 pb-8">
-             <PrimaryButton 
+             <PrimaryButton
                 @click="handleSuccessContinue"
+                :disabled="isLoading"
              >
-                Начать тренировку
+                {{ isLoading ? 'Сохранение...' : 'Начать тренировку' }}
              </PrimaryButton>
          </div>
       </div>

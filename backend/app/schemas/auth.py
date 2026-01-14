@@ -1,6 +1,6 @@
 """Authentication schemas"""
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_serializer
 from typing import Optional
 from uuid import UUID
 from datetime import datetime
@@ -24,18 +24,38 @@ class LogoutResponse(BaseModel):
     message: str
 
 
+class UserProfileResponse(BaseModel):
+    """User profile data"""
+    model_config = ConfigDict(from_attributes=True)
+
+    age: Optional[int] = None
+    weight: Optional[float] = None
+    height: Optional[int] = None
+    fitness_goal: Optional[str] = None
+    fitness_level: Optional[str] = None
+    preferred_units: str = "metric"
+    language: str = "ru"
+    notifications_enabled: bool = True
+
+
 class UserResponse(BaseModel):
     """User data response (NO tokens in body - they're in HttpOnly cookies)"""
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     email: EmailStr
     full_name: Optional[str]
     avatar_url: Optional[str]
     oauth_provider: str
     created_at: datetime
+    profile: Optional[UserProfileResponse] = None
 
-    class Config:
-        from_attributes = True
-        json_encoders = {
-            UUID: lambda v: str(v),  # Convert UUID to string in JSON response
-            datetime: lambda v: v.isoformat()  # Convert datetime to ISO format string
-        }
+    @field_serializer('id')
+    def serialize_id(self, value: UUID) -> str:
+        """Convert UUID to string"""
+        return str(value)
+
+    @field_serializer('created_at')
+    def serialize_created_at(self, value: datetime) -> str:
+        """Convert datetime to ISO format string"""
+        return value.isoformat()

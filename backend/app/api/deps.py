@@ -38,8 +38,14 @@ async def get_current_user(
     if user_id is None:
         raise credentials_exception
 
-    # Get user from database
-    result = await db.execute(select(User).filter(User.id == user_id))
+    # Get user from database with profile
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.profile))
+        .filter(User.id == user_id)
+    )
     user = result.scalars().first()
 
     if user is None:
