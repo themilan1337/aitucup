@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
+from sqlalchemy.orm import selectinload
 from datetime import date, timedelta
 from app.database import get_db
 from app.api.deps import get_current_user
@@ -102,16 +103,46 @@ async def get_current_plan(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get the active workout plan for the current user"""
+    """Get the active workout plan for the current user with all days and exercises"""
     result = await db.execute(
         select(WorkoutPlan)
         .filter(WorkoutPlan.user_id == current_user.id, WorkoutPlan.is_active == True)
+        .options(
+            selectinload(WorkoutPlan.days).selectinload(PlanDay.exercises)
+        )
     )
     plan = result.scalars().first()
-    
+
     if not plan:
         raise HTTPException(status_code=404, detail="No active plan found")
-        
-    # In a real response we would use a proper Pydantic schema with nested data
-    # For now, let's return a simple structure or the plan object if SQLAlchemy allows
-    return plan
+
+    # Build response with nested data
+    return {
+        "id": str(plan.id),
+        "user_id": str(plan.user_id),
+        "week_start_date": plan.week_start_date.isoformat(),
+        "is_active": plan.is_active,
+        "created_at": plan.created_at.isoformat() if plan.created_at else None,
+        "days": [
+            {
+                "id": str(day.id),
+                "day_number": day.day_number,
+                "date": day.date.isoformat(),
+                "is_rest_day": day.is_rest_day,
+                "is_completed": day.is_completed,
+                "completed_at": day.completed_at.isoformat() if day.completed_at else None,
+                "exercises": [
+                    {
+                        "id": str(ex.id),
+                        "exercise_type": ex.exercise_type,
+                        "target_sets": ex.target_sets,
+                        "target_reps": ex.target_reps,
+                        "estimated_minutes": ex.estimated_minutes,
+                        "order_index": ex.order_index
+                    }
+                    for ex in day.exercises
+                ]
+            }
+            for day in plan.days
+        ]
+    }

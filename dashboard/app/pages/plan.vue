@@ -120,7 +120,7 @@ const progressPercentage = computed(() => {
  * Week navigation
  */
 const canGoToPreviousWeek = computed(() => currentWeek.value > 0)
-const canGoToNextWeek = computed(() => currentWeek.value < 3 && plan.value && plan.value.days.length > (currentWeek.value + 1) * 7)
+const canGoToNextWeek = computed(() => currentWeek.value < 3 && plan.value?.days && plan.value.days.length > (currentWeek.value + 1) * 7)
 
 const previousWeek = () => {
   if (canGoToPreviousWeek.value) {
@@ -349,22 +349,30 @@ onMounted(() => {
             <button
               @click="showRegenerateDialog = false"
               :disabled="regenerating"
-              class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 font-medium transition"
+              class="flex-1 py-3 rounded-xl bg-white/5 hover:bg-white/10 font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Отмена
             </button>
             <button
               @click="handleRegeneratePlan"
               :disabled="regenerating"
-              class="flex-1 py-3 rounded-xl bg-neon text-black font-bold hover:brightness-110 transition flex items-center justify-center gap-2"
+              class="flex-1 py-3 rounded-xl bg-neon text-black font-bold hover:brightness-110 transition flex items-center justify-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed"
             >
               <Icon
                 v-if="regenerating"
                 icon="heroicons:arrow-path"
                 class="animate-spin"
               />
-              <span>{{ regenerating ? 'Создание...' : 'Создать' }}</span>
+              <span v-if="regenerating">AI генерирует план...</span>
+              <span v-else>Создать</span>
             </button>
+          </div>
+
+          <!-- Progress hint during generation -->
+          <div v-if="regenerating" class="mt-4 text-center">
+            <p class="text-xs text-gray-500">
+              Это может занять до 2 минут. Пожалуйста, подождите...
+            </p>
           </div>
         </div>
      </div>

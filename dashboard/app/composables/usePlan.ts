@@ -51,9 +51,10 @@ export const usePlan = () => {
   /**
    * Generate a new 30-day workout plan
    * Deactivates old plans and creates a new one based on user profile
+   * Uses extended timeout (5 min) since AI generation can take a while
    */
   const generatePlan = async (): Promise<GeneratePlanResponse> => {
-    return await api.post<GeneratePlanResponse>('/api/v1/plans/generate')
+    return await api.post<GeneratePlanResponse>('/api/v1/plans/generate', undefined, { timeout: 300000 })
   }
 
   return {

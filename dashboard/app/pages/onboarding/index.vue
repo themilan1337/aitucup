@@ -10,12 +10,14 @@ import { useAuthStore } from '~/stores/auth'
 
 const store = useOnboardingStore()
 const authStore = useAuthStore()
+const { generatePlan } = usePlan()
 const router = useRouter()
 
 // Steps definition
 type Step = 'welcome' | 'goal' | 'level' | 'gender' | 'physical-params' | 'how-it-works' | 'preparing' | 'success'
 const currentStep = ref<Step>('welcome')
 const isLoading = ref(false)
+const preparingError = ref<string | null>(null)
 
 // Data for steps
 const goals = [
@@ -98,51 +100,45 @@ const handleHowItWorksContinue = () => {
   startPreparing()
 }
 
-const startPreparing = () => {
+const startPreparing = async () => {
   isLoading.value = true
-  setTimeout(() => {
-    isLoading.value = false
-    nextStep('success')
-    launchConfetti()
-  }, 3000) // 3 seconds simulation
-}
-
-const handleSuccessContinue = async () => {
-  isLoading.value = true
+  preparingError.value = null
 
   try {
-    // Get auth store to update profile
-    const authStore = useAuthStore()
-
-    // Prepare profile data from onboarding
+    // Step 1: Save profile to backend
     const profileData = {
       age: store.age,
       weight: store.weight,
       height: store.height,
       fitness_goal: store.goal,
       fitness_level: store.level,
-      // gender не сохраняется в UserProfile в текущей схеме backend
     }
 
-    // Send data to backend
-    const success = await authStore.updateProfile(profileData)
-
-    if (!success) {
-      throw new Error('Failed to update profile')
+    const profileSuccess = await authStore.updateProfile(profileData)
+    if (!profileSuccess) {
+      throw new Error('Не удалось сохранить профиль')
     }
 
-    // Mark onboarding as completed
+    // Step 2: Generate the workout plan
+    await generatePlan()
+
+    // Step 3: Mark onboarding as completed
     store.completeOnboarding()
 
-    // Redirect to home
-    router.push('/home')
-  } catch (error: any) {
-    console.error('Failed to save onboarding data:', error)
-    // Show error to user (you can add error state if needed)
-    alert('Не удалось сохранить данные. Попробуйте снова.')
-  } finally {
+    // Step 4: Success!
     isLoading.value = false
+    nextStep('success')
+    launchConfetti()
+  } catch (error: any) {
+    console.error('Onboarding preparation failed:', error)
+    isLoading.value = false
+    preparingError.value = error.message || 'Произошла ошибка. Попробуйте снова.'
   }
+}
+
+const handleSuccessContinue = () => {
+  // Everything is already saved in startPreparing, navigate to plan page
+  router.push('/plan')
 }
 
 // Confetti Effect
@@ -569,15 +565,30 @@ onUnmounted(() => {
       </div>
 
       <!-- STEP 7: PREPARING -->
-      <div v-else-if="currentStep === 'preparing'" class="flex-1 w-full flex flex-col items-center justify-center text-center">
-         <div class="relative w-32 h-32 mb-8 items-center justify-center flex">
-             <!-- Spinner Ring -->
-             <div class="absolute inset-0 border-4 border-[#1A1A1A] rounded-full"></div>
-             <div class="absolute inset-0 border-4 border-[#CCFF00] rounded-full animate-spin border-t-transparent"></div>
-             <Icon icon="hugeicons:ai-brain-01" class="text-5xl text-[#CCFF00]" />
-         </div>
-         <h2 class="text-2xl font-bold mb-2">Формируем ваш план тренировок</h2>
-         <p class="text-gray-400 mb-8">План создаётся на основе ваших целей и уровня подготовки</p>
+      <div v-else-if="currentStep === 'preparing'" class="flex-1 w-full flex flex-col items-center justify-center text-center px-4">
+         <!-- Error State -->
+         <template v-if="preparingError">
+           <div class="w-24 h-24 bg-red-500/20 rounded-full flex items-center justify-center mb-8">
+             <Icon icon="hugeicons:alert-02" class="text-5xl text-red-500" />
+           </div>
+           <h2 class="text-2xl font-bold mb-2">Не удалось создать план</h2>
+           <p class="text-gray-400 mb-8">{{ preparingError }}</p>
+           <PrimaryButton @click="startPreparing">
+             Попробовать снова
+           </PrimaryButton>
+         </template>
+
+         <!-- Loading State -->
+         <template v-else>
+           <div class="relative w-32 h-32 mb-8 items-center justify-center flex">
+               <!-- Spinner Ring -->
+               <div class="absolute inset-0 border-4 border-[#1A1A1A] rounded-full"></div>
+               <div class="absolute inset-0 border-4 border-[#CCFF00] rounded-full animate-spin border-t-transparent"></div>
+               <Icon icon="hugeicons:ai-brain-01" class="text-5xl text-[#CCFF00]" />
+           </div>
+           <h2 class="text-2xl font-bold mb-2">Формируем ваш план тренировок</h2>
+           <p class="text-gray-400 mb-8">ИИ создаёт персональный план на основе ваших целей. Это может занять до 2 минут...</p>
+         </template>
       </div>
 
       <!-- STEP 8: SUCCESS -->
@@ -590,11 +601,8 @@ onUnmounted(() => {
          <p class="text-gray-400 mb-12 max-w-xs mx-auto">Начните первую тренировку и отслеживайте прогресс каждый день.</p>
 
          <div class="w-full space-y-4 max-w-md mx-auto px-4 pb-8">
-             <PrimaryButton
-                @click="handleSuccessContinue"
-                :disabled="isLoading"
-             >
-                {{ isLoading ? 'Сохранение...' : 'Начать тренировку' }}
+             <PrimaryButton @click="handleSuccessContinue">
+                Начать тренировку
              </PrimaryButton>
          </div>
       </div>

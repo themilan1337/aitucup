@@ -13,6 +13,7 @@ interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: any
   requiresCsrf?: boolean
+  timeout?: number // Timeout in milliseconds
 }
 
 interface CsrfResponse {
@@ -84,11 +85,10 @@ export const useApi = () => {
     endpoint: string,
     options: ApiOptions = {}
   ): Promise<T> => {
-    const {
-      method = 'GET',
-      body = null,
-      requiresCsrf = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method),
-    } = options
+    const method = options.method ?? 'GET'
+    const body = options.body ?? null
+    const requiresCsrf = options.requiresCsrf ?? ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)
+    const timeout = options.timeout ?? 120000 // Default 120 seconds
 
     // Build headers
     const headers: HeadersInit = {
@@ -106,6 +106,10 @@ export const useApi = () => {
       }
     }
 
+    // Create AbortController for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
+
     // Make request
     try {
       const response = await fetch(`${baseURL}${endpoint}`, {
@@ -113,7 +117,10 @@ export const useApi = () => {
         headers,
         credentials: 'include', // CRITICAL: Send HttpOnly cookies
         body: body ? JSON.stringify(body) : null,
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
 
       // Handle CSRF token errors (403) - fetch new token and retry once
       if (response.status === 403 && requiresCsrf) {
@@ -128,6 +135,7 @@ export const useApi = () => {
           headers,
           credentials: 'include',
           body: body ? JSON.stringify(body) : null,
+          signal: controller.signal,
         })
 
         if (!retryResponse.ok) {
@@ -157,6 +165,7 @@ export const useApi = () => {
           headers,
           credentials: 'include',
           body: body ? JSON.stringify(body) : null,
+          signal: controller.signal,
         })
 
         if (!retryResponse.ok) {
@@ -177,7 +186,15 @@ export const useApi = () => {
       // Parse and return response
       const data = await response.json()
       return data
-    } catch (error) {
+    } catch (error: any) {
+      clearTimeout(timeoutId)
+
+      // Handle abort/timeout errors
+      if (error.name === 'AbortError') {
+        console.error('Request timeout:', endpoint)
+        throw new Error('Request timed out. Please try again.')
+      }
+
       console.error('API Request Error:', error)
       throw error
     }
@@ -186,20 +203,20 @@ export const useApi = () => {
   /**
    * Convenience methods for different HTTP verbs
    */
-  const get = <T = any>(endpoint: string) =>
-    request<T>(endpoint, { method: 'GET' })
+  const get = <T = any>(endpoint: string, options?: { timeout?: number }) =>
+    request<T>(endpoint, { method: 'GET', timeout: options?.timeout })
 
-  const post = <T = any>(endpoint: string, body?: any) =>
-    request<T>(endpoint, { method: 'POST', body })
+  const post = <T = any>(endpoint: string, body?: any, options?: { timeout?: number }) =>
+    request<T>(endpoint, { method: 'POST', body, timeout: options?.timeout })
 
-  const put = <T = any>(endpoint: string, body?: any) =>
-    request<T>(endpoint, { method: 'PUT', body })
+  const put = <T = any>(endpoint: string, body?: any, options?: { timeout?: number }) =>
+    request<T>(endpoint, { method: 'PUT', body, timeout: options?.timeout })
 
-  const patch = <T = any>(endpoint: string, body?: any) =>
-    request<T>(endpoint, { method: 'PATCH', body })
+  const patch = <T = any>(endpoint: string, body?: any, options?: { timeout?: number }) =>
+    request<T>(endpoint, { method: 'PATCH', body, timeout: options?.timeout })
 
-  const del = <T = any>(endpoint: string) =>
-    request<T>(endpoint, { method: 'DELETE' })
+  const del = <T = any>(endpoint: string, options?: { timeout?: number }) =>
+    request<T>(endpoint, { method: 'DELETE', timeout: options?.timeout })
 
   return {
     request,

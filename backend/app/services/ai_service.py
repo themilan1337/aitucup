@@ -14,8 +14,9 @@ class AIWorkoutPlanner:
             azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
             openai_api_key=settings.AZURE_OPENAI_API_KEY,
             deployment_name=settings.AZURE_OPENAI_DEPLOYMENT,
-            openai_api_version=settings.AZURE_OPENAI_API_VERSION,
-            temperature=0.7
+            openai_api_version=settings.AZURE_OPENAI_API_VERSION
+            # Note: temperature parameter removed - some models (gpt-4o-mini, o1 series)
+            # only support the default temperature=1
         )
         self.structured_llm = self.llm.with_structured_output(MonthlyPlanAI)
 
@@ -33,11 +34,14 @@ class AIWorkoutPlanner:
     def _generate_prompt_variables(self, user_data: UserProfileData) -> dict:
         """Generate dynamic prompt variables based on user profile"""
 
-        # Mapping to Russian
+        # Mapping to Russian (support both hyphen and underscore formats)
         goal_map = {
             "lose_weight": "Похудение",
+            "lose-weight": "Похудение",
             "get_toned": "Приведение мышц в тонус",
-            "improve_shape": "Улучшение общей физической формы"
+            "get-toned": "Приведение мышц в тонус",
+            "improve_shape": "Улучшение общей физической формы",
+            "improve-shape": "Улучшение общей физической формы"
         }
         level_map = {
             "beginner": "Новичок",

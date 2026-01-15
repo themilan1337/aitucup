@@ -119,6 +119,26 @@ export const useAuthStore = defineStore('auth', {
         this.isAuthenticated = true
         this.isLoading = false
 
+        // 4. Sync onboarding store with user profile
+        const onboardingStore = useOnboardingStore()
+
+        // Check if user has completed profile
+        const hasProfile = !!(
+          user.profile?.age &&
+          user.profile?.weight &&
+          user.profile?.height &&
+          user.profile?.fitness_goal &&
+          user.profile?.fitness_level
+        )
+
+        if (hasProfile) {
+          // User has complete profile - mark onboarding as completed
+          onboardingStore.completeOnboarding()
+        } else {
+          // New user or incomplete profile - reset onboarding
+          onboardingStore.resetOnboarding()
+        }
+
         return true
       } catch (error: any) {
         console.error('Login failed:', error)
@@ -153,6 +173,10 @@ export const useAuthStore = defineStore('auth', {
         const api = useApi()
         api.clearCsrfToken()
 
+        // Reset onboarding store to avoid state pollution
+        const onboardingStore = useOnboardingStore()
+        onboardingStore.resetOnboarding()
+
         // Redirect to login page
         await navigateTo('/login')
       }
@@ -180,6 +204,10 @@ export const useAuthStore = defineStore('auth', {
         const api = useApi()
         api.clearCsrfToken()
 
+        // Reset onboarding store to avoid state pollution
+        const onboardingStore = useOnboardingStore()
+        onboardingStore.resetOnboarding()
+
         // Redirect to login page
         await navigateTo('/login')
       }
@@ -201,6 +229,22 @@ export const useAuthStore = defineStore('auth', {
         // Update user data
         this.user = user
         this.isAuthenticated = true
+
+        // Sync onboarding store with user profile
+        const onboardingStore = useOnboardingStore()
+        const hasProfile = !!(
+          user.profile?.age &&
+          user.profile?.weight &&
+          user.profile?.height &&
+          user.profile?.fitness_goal &&
+          user.profile?.fitness_level
+        )
+
+        if (hasProfile) {
+          onboardingStore.completeOnboarding()
+        } else {
+          onboardingStore.resetOnboarding()
+        }
 
         return true
       } catch (error) {
@@ -230,6 +274,22 @@ export const useAuthStore = defineStore('auth', {
         this.user = user
         this.isAuthenticated = true
         this.isLoading = false
+
+        // Sync onboarding store with user profile
+        const onboardingStore = useOnboardingStore()
+        const hasProfile = !!(
+          user.profile?.age &&
+          user.profile?.weight &&
+          user.profile?.height &&
+          user.profile?.fitness_goal &&
+          user.profile?.fitness_level
+        )
+
+        if (hasProfile) {
+          onboardingStore.completeOnboarding()
+        } else {
+          onboardingStore.resetOnboarding()
+        }
 
         return true
       } catch (error: any) {
@@ -263,6 +323,20 @@ export const useAuthStore = defineStore('auth', {
 
         // Update local user data
         this.user = updatedUser
+
+        // Sync onboarding store with updated profile
+        const onboardingStore = useOnboardingStore()
+        const hasProfile = !!(
+          updatedUser.profile?.age &&
+          updatedUser.profile?.weight &&
+          updatedUser.profile?.height &&
+          updatedUser.profile?.fitness_goal &&
+          updatedUser.profile?.fitness_level
+        )
+
+        if (hasProfile) {
+          onboardingStore.completeOnboarding()
+        }
 
         return true
       } catch (error) {
