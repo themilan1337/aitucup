@@ -63,85 +63,150 @@ export interface TrainingStoreState {
 
 export const useTrainingStore = defineStore('training', {
   state: (): TrainingStoreState => ({
-    streak: 19,
-    todayExercises: [
-      { id: '1', name: 'Приседания', sets: 3, reps: 20, muscleGroup: 'Ноги', completed: false },
-      { id: '2', name: 'Выпады', sets: 3, reps: 15, muscleGroup: 'Ноги', completed: false },
-    ],
+    streak: 0,
+    todayExercises: [],
     weeklyStats: {
-      workouts: 4,
-      calories: 111,
-      minutes: 50,
+      workouts: 0,
+      calories: 0,
+      minutes: 0,
     },
     lifetimeStats: {
-      totalWorkouts: 19,
-      totalReps: 908,
-      avgAccuracy: 86,
-      bestStreak: 3,
+      totalWorkouts: 0,
+      totalReps: 0,
+      avgAccuracy: 0,
+      bestStreak: 0,
     },
     progressData: {
-      // Mock data points for the trend chart
-      accuracyTrend: [82, 85, 83, 86, 88, 87, 86, 89, 90, 88, 87, 86, 88, 89],
-      // Mock data for weekly bar chart (Mon-Sun)
-      weeklyFrequency: [1, 1, 1, 0, 1, 0, 0], // 1 = trained, 0 = rest
+      accuracyTrend: [],
+      weeklyFrequency: [],
     },
     records: {
-      squats: 28,
-      lunges: 40,
-      pushups: 22,
-      plank: 1, // '1 сек' in screenshot? likely placeholder, but keeping type consistent
+      squats: 0,
+      lunges: 0,
+      pushups: 0,
+      plank: 0,
     },
-    workoutHistory: [
-      {
-        date: '11 января',
-        exercises: [
-          { name: 'Выпады', reps: 40, icon: 'heroicons:bolt' },
-          { name: 'Приседания', reps: 28, icon: 'heroicons:bolt' },
-          { name: 'Планка', reps: 1, icon: 'heroicons:bolt' },
-        ],
-        calories: 45,
-        duration: '4:09',
-        accuracy: 86,
-        completed: true,
-      },
-      {
-        date: '10 января',
-        exercises: [
-          { name: 'Приседания', reps: 15, icon: 'heroicons:bolt' },
-          { name: 'Планка', reps: 1, icon: 'heroicons:bolt' },
-          { name: 'Отжимания', reps: 17, icon: 'heroicons:bolt' },
-        ],
-        calories: 25,
-        duration: '2:46',
-        accuracy: 88,
-        completed: true,
-      },
-      {
-        date: '8 января',
-        exercises: [
-          { name: 'Приседания', reps: 19, icon: 'heroicons:bolt' },
-          { name: 'Отжимания', reps: 20, icon: 'heroicons:bolt' },
-        ],
-        calories: 23,
-        duration: '1:57',
-        accuracy: 88,
-        completed: true,
-      },
-    ],
-    achievements: [
-      { id: '1', name: 'Первая тренировка', icon: 'heroicons:star', unlocked: true, description: 'Завершите первую тренировку' },
-      { id: '2', name: 'Серия 7 дней', icon: 'heroicons:fire', unlocked: true, description: 'Тренируйтесь 7 дней подряд' },
-      { id: '3', name: '100 повторений', icon: 'heroicons:trophy', unlocked: false, description: 'Выполните 100 повторений' },
-      { id: '4', name: 'Мастер формы', icon: 'heroicons:check-badge', unlocked: true, description: 'Достигните точности 90%' },
-      { id: '5', name: '20 тренировок', icon: 'heroicons:calendar', unlocked: false, description: 'Завершите 20 тренировок' },
-      { id: '6', name: 'Серия 30 дней', icon: 'heroicons:bolt', unlocked: false, description: 'Тренируйтесь 30 дней подряд' },
-    ],
+    workoutHistory: [],
+    achievements: [],
   }),
   actions: {
     toggleExerciseCompletion(id: string) {
       const ex = this.todayExercises.find((e) => e.id === id)
       if (ex) {
         ex.completed = !ex.completed
+      }
+    },
+
+    /**
+     * Load statistics for a specific time period
+     * Note: Only 'week' and 'all' periods update the store state
+     * The 'month' period data is returned but not stored
+     */
+    async loadStats(period: 'week' | 'month' | 'all' = 'all') {
+      try {
+        const { getDashboardStats } = useStats()
+        const stats = await getDashboardStats(period)
+
+        if (period === 'week') {
+          this.weeklyStats = {
+            workouts: stats.total_workouts,
+            calories: stats.total_calories,
+            minutes: stats.total_minutes,
+          }
+        } else if (period === 'all') {
+          this.lifetimeStats = {
+            totalWorkouts: stats.total_workouts,
+            totalReps: stats.total_reps,
+            avgAccuracy: Math.round(stats.average_accuracy * 100),
+            bestStreak: stats.current_streak,
+          }
+          this.streak = stats.current_streak
+        }
+        // 'month' period is only used for display in progress.vue,
+        // not stored in state
+
+        return stats
+      } catch (error) {
+        console.error('Failed to load stats:', error)
+        throw error
+      }
+    },
+
+    /**
+     * Load personal records
+     */
+    async loadPersonalRecords() {
+      try {
+        const { getPersonalRecords } = useStats()
+        const records = await getPersonalRecords()
+
+        this.records = {
+          squats: records.squat,
+          lunges: records.lunge,
+          pushups: records.pushup,
+          plank: records.plank,
+        }
+
+        return records
+      } catch (error) {
+        console.error('Failed to load personal records:', error)
+        throw error
+      }
+    },
+
+    /**
+     * Load accuracy trend data
+     */
+    async loadAccuracyTrend(days: number = 14) {
+      try {
+        const { getAccuracyTrend } = useStats()
+        const trend = await getAccuracyTrend(days)
+
+        // Convert to percentage array
+        this.progressData.accuracyTrend = trend.map(point =>
+          Math.round(point.accuracy * 100)
+        )
+
+        return trend
+      } catch (error) {
+        console.error('Failed to load accuracy trend:', error)
+        throw error
+      }
+    },
+
+    /**
+     * Load weekly workout frequency
+     */
+    async loadWeeklyFrequency() {
+      try {
+        const { getWeeklyFrequency } = useStats()
+        const frequency = await getWeeklyFrequency()
+
+        // Convert boolean array to number array (1 = trained, 0 = rest)
+        this.progressData.weeklyFrequency = frequency.map(trained => trained ? 1 : 0)
+
+        return frequency
+      } catch (error) {
+        console.error('Failed to load weekly frequency:', error)
+        throw error
+      }
+    },
+
+    /**
+     * Load all statistics data
+     */
+    async loadAllStats() {
+      try {
+        await Promise.all([
+          this.loadStats('week'),
+          this.loadStats('all'),
+          this.loadPersonalRecords(),
+          this.loadAccuracyTrend(14),
+          this.loadWeeklyFrequency(),
+        ])
+      } catch (error) {
+        console.error('Failed to load all stats:', error)
+        throw error
       }
     }
   },
