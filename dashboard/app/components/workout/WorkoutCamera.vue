@@ -13,8 +13,6 @@ const emit = defineEmits<{
   endTraining: [];
 }>();
 
-const config = useRuntimeConfig();
-
 // Camera state
 const videoRef = ref<HTMLVideoElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
@@ -26,10 +24,22 @@ const isCameraReady = ref(false);
 const videoIntrinsicWidth = ref(1280);
 const videoIntrinsicHeight = ref(720);
 
-// WebSocket state
-const ws = ref<WebSocket | null>(null);
-const isConnected = ref(false);
-const connectionError = ref<string | null>(null);
+// MediaPipe Pose (local detection)
+const {
+  isLoading: mediaPipeLoading,
+  isReady: mediaPipeReady,
+  error: mediaPipeError,
+  keypoints,
+  anglePoint,
+  currentAngle,
+  reps: detectedReps,
+  formCorrections,
+  isInPosition,
+  initialize: initializeMediaPipe,
+  processFrame,
+  resetCounter: resetMediaPipeCounter,
+  isTimedExercise,
+} = useMediaPipe({ targetFps: 15 });
 
 // Training state
 const currentExerciseIndex = ref(0);
@@ -38,6 +48,11 @@ const currentReps = ref(0);
 const isResting = ref(false);
 const restTimeLeft = ref(0);
 const showingResults = ref(false);
+
+// Timed exercise state (e.g., plank)
+const timedExerciseSeconds = ref(0);
+const targetTimedSeconds = ref(30); // Default target time for plank
+let timedExerciseInterval: ReturnType<typeof setInterval> | null = null;
 
 // Training stats
 const totalReps = ref(0);
@@ -50,11 +65,6 @@ const isDetectingMovement = ref(false);
 const formQuality = ref(0); // 0-100
 const lastReps = ref(0);
 
-// Keypoints from backend
-const keypoints = ref<number[][] | null>(null);
-const anglePoint = ref<number[][] | null>(null);
-const currentAngle = ref<number | null>(null);
-
 // Per-exercise statistics for persistence
 interface ExerciseStats {
   reps: number;
@@ -65,14 +75,17 @@ interface ExerciseStats {
 }
 const exerciseStats = ref<Map<number, ExerciseStats>>(new Map());
 
-// Form corrections from backend
-const formCorrections = ref<string[]>([]);
+// Form corrections display
+const displayedCorrections = ref<string[]>([]);
 
 // Workout persistence
 const { saveWorkout } = useWorkouts();
 const saving = ref(false);
 const unlockedAchievements = ref<any[]>([]);
 const showAchievementDialog = ref(false);
+
+// Animation frame ID for cleanup
+let animationFrameId: number | null = null;
 
 const currentExercise = computed(
   () => props.exercises[currentExerciseIndex.value]
@@ -98,7 +111,14 @@ const elapsedTime = computed(() => {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 });
 
-// Get exercise type identifier for backend
+// Check if current exercise is timed (like plank)
+const isCurrentExerciseTimed = computed(() => {
+  if (!currentExercise.value) return false;
+  const exerciseType = getExerciseType(currentExercise.value.name);
+  return isTimedExercise(exerciseType);
+});
+
+// Get exercise type identifier
 const getExerciseType = (exerciseName: string): string => {
   const mapping: Record<string, string> = {
     Приседания: "squat",
@@ -141,11 +161,10 @@ const initCamera = async () => {
         }
 
         // Wait for video to be displayed, then initialize canvas
-        // Use nextTick to ensure video element is rendered
         setTimeout(() => {
           updateCanvasSize();
-          // Connect to WebSocket after camera is ready
-          connectWebSocket();
+          // Start pose detection loop after camera is ready
+          startPoseDetection();
         }, 100);
 
         // Update canvas on resize (for mobile orientation changes)
@@ -159,144 +178,132 @@ const initCamera = async () => {
   }
 };
 
-// Connect to WebSocket
-const connectWebSocket = () => {
-  const wsUrl =
-    config.public.apiUrl.replace("http", "ws") + "/api/v1/vision/ws/pose";
-  console.log("Connecting to WebSocket:", wsUrl);
+// Start timed exercise timer (for plank, etc.)
+const startTimedExerciseTimer = () => {
+  if (timedExerciseInterval) return; // Already running
 
-  ws.value = new WebSocket(wsUrl);
+  timedExerciseInterval = setInterval(() => {
+    if (isInPosition.value && !isResting.value && !showingResults.value) {
+      timedExerciseSeconds.value++;
 
-  ws.value.onopen = () => {
-    console.log("✓ WebSocket connected");
-    isConnected.value = true;
-    connectionError.value = null;
-    startSendingFrames();
-  };
+      // Update form quality for timed exercises
+      formQuality.value = Math.min(95, 70 + timedExerciseSeconds.value);
 
-  ws.value.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-
-      if (data.error) {
-        console.error("Backend error:", data.error);
-        return;
+      // Check if target time reached
+      if (currentExercise.value && timedExerciseSeconds.value >= currentExercise.value.reps) {
+        handleTimedExerciseComplete();
       }
-
-      if (data.success) {
-        // Update keypoints for visualization
-        if (data.keypoints) {
-          keypoints.value = data.keypoints;
-          drawSkeleton();
-        }
-
-        // Update angle visualization
-        if (data.angle_point) {
-          anglePoint.value = data.angle_point;
-        }
-        if (data.angle !== undefined) {
-          currentAngle.value = data.angle;
-        }
-
-        // Update rep count
-        if (data.reps !== undefined && data.reps !== lastReps.value) {
-          lastReps.value = data.reps;
-          handleRepDetected(data.reps);
-        }
-
-        // Calculate form quality based on angle (mock for now)
-        if (data.angle !== undefined) {
-          formQuality.value = Math.min(
-            95,
-            Math.max(70, Math.floor(data.angle / 2))
-          );
-        }
-
-        // Handle form corrections from backend
-        if (data.form_corrections && data.form_corrections.length > 0) {
-          formCorrections.value = data.form_corrections;
-          // Auto-hide after 3 seconds
-          setTimeout(() => {
-            formCorrections.value = [];
-          }, 3000);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to parse WebSocket message:", error);
     }
-  };
-
-  ws.value.onerror = (error) => {
-    console.error("WebSocket error:", error);
-    connectionError.value = "Ошибка подключения к серверу";
-    isConnected.value = false;
-  };
-
-  ws.value.onclose = () => {
-    console.log("WebSocket disconnected");
-    isConnected.value = false;
-  };
+  }, 1000);
 };
 
-// Send video frames to backend
-let frameInterval: number | null = null;
-const startSendingFrames = () => {
-  if (frameInterval) clearInterval(frameInterval);
+// Stop timed exercise timer
+const stopTimedExerciseTimer = () => {
+  if (timedExerciseInterval) {
+    clearInterval(timedExerciseInterval);
+    timedExerciseInterval = null;
+  }
+};
 
-  // Send frames every 100ms (10 FPS) to balance performance and accuracy
-  frameInterval = setInterval(() => {
+// Handle timed exercise complete (e.g., plank reached 30 seconds)
+const handleTimedExerciseComplete = () => {
+  if (!currentExercise.value) return;
+
+  const exIndex = currentExerciseIndex.value;
+
+  // Initialize stats for this exercise if not exists
+  if (!exerciseStats.value.has(exIndex)) {
+    exerciseStats.value.set(exIndex, {
+      reps: 0,
+      duration: 0,
+      formAccuracySum: 0,
+      formAccuracyCount: 0,
+      startTime: new Date(),
+    });
+  }
+
+  const stats = exerciseStats.value.get(exIndex)!;
+  stats.reps = timedExerciseSeconds.value; // For timed exercises, reps = seconds
+  stats.formAccuracySum += formQuality.value;
+  stats.formAccuracyCount++;
+
+  totalReps.value += timedExerciseSeconds.value;
+
+  // Update average accuracy
+  accuracy.value = Math.floor(
+    (accuracy.value * (totalReps.value - timedExerciseSeconds.value) + formQuality.value * timedExerciseSeconds.value) /
+      totalReps.value
+  );
+
+  // Stop timer and move to next
+  stopTimedExerciseTimer();
+  handleSetComplete();
+};
+
+// Start local pose detection loop
+const startPoseDetection = () => {
+  const detectPose = async () => {
     if (
-      !isConnected.value ||
       !videoRef.value ||
+      !mediaPipeReady.value ||
       isResting.value ||
       showingResults.value
-    )
+    ) {
+      animationFrameId = requestAnimationFrame(detectPose);
       return;
+    }
 
     try {
-      // Create temporary canvas to capture video frame
-      const tempCanvas = document.createElement("canvas");
-      tempCanvas.width = videoRef.value.videoWidth;
-      tempCanvas.height = videoRef.value.videoHeight;
-      const ctx = tempCanvas.getContext("2d");
+      const exerciseType = currentExercise.value
+        ? getExerciseType(currentExercise.value.name)
+        : "squat";
 
-      if (ctx) {
-        // Mirror the video horizontally
-        ctx.save();
-        ctx.scale(-1, 1);
-        ctx.drawImage(
-          videoRef.value,
-          -tempCanvas.width,
-          0,
-          tempCanvas.width,
-          tempCanvas.height
-        );
-        ctx.restore();
+      await processFrame(videoRef.value, exerciseType);
 
-        // Convert to base64
-        const frameData = tempCanvas.toDataURL("image/jpeg", 0.7);
+      // Update keypoints visualization
+      if (keypoints.value) {
+        drawSkeleton();
+      }
 
-        // Send to backend
-        if (
-          ws.value &&
-          ws.value.readyState === WebSocket.OPEN &&
-          currentExercise.value
-        ) {
-          ws.value.send(
-            JSON.stringify({
-              frame: frameData,
-              exercise: getExerciseType(currentExercise.value.name),
-            })
-          );
+      // Handle timed exercises differently
+      if (isCurrentExerciseTimed.value) {
+        // Start timer if not already running
+        startTimedExerciseTimer();
+      } else {
+        // Check for rep count changes for regular exercises
+        if (detectedReps.value !== lastReps.value) {
+          handleRepDetected(detectedReps.value);
+          lastReps.value = detectedReps.value;
         }
       }
+
+      // Calculate form quality based on angle (for non-timed exercises)
+      if (!isCurrentExerciseTimed.value && currentAngle.value !== null) {
+        formQuality.value = Math.min(
+          95,
+          Math.max(70, Math.floor(currentAngle.value / 2))
+        );
+      }
+
+      // Handle form corrections
+      if (formCorrections.value.length > 0) {
+        displayedCorrections.value = [...formCorrections.value];
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+          displayedCorrections.value = [];
+        }, 3000);
+      }
     } catch (error) {
-      console.error("Failed to send frame:", error);
+      console.error("Pose detection error:", error);
     }
-  }, 100);
+
+    animationFrameId = requestAnimationFrame(detectPose);
+  };
+
+  animationFrameId = requestAnimationFrame(detectPose);
 };
 
-// Handle rep detected from backend
+// Handle rep detected from local counter
 const handleRepDetected = (reps: number) => {
   if (!currentExercise.value) return;
 
@@ -368,14 +375,14 @@ const scaleKeypoints = (
   fromHeight: number,
   toWidth: number,
   toHeight: number
-): number[][] => {
+): [number, number][] => {
   const scale = Math.max(toWidth / fromWidth, toHeight / fromHeight);
   const offsetX = (toWidth - fromWidth * scale) / 2;
   const offsetY = (toHeight - fromHeight * scale) / 2;
 
-  return points.map((point) => [
-    point[0] * scale + offsetX,
-    point[1] * scale + offsetY,
+  return points.map((point): [number, number] => [
+    (point[0] ?? 0) * scale + offsetX,
+    (point[1] ?? 0) * scale + offsetY,
   ]);
 };
 
@@ -416,8 +423,8 @@ const drawSkeleton = () => {
 
   // Mirror coordinates because canvas is mirrored via CSS transform: scaleX(-1)
   // Formula: mirrored_x = canvas_width - original_x
-  const mirrorKeypoints = (points: number[][]): number[][] => {
-    return points.map((point) => [displayedWidth - point[0], point[1]]);
+  const mirrorKeypoints = (points: [number, number][]): [number, number][] => {
+    return points.map((point): [number, number] => [displayedWidth - point[0], point[1]]);
   };
 
   const mirroredKeypoints = mirrorKeypoints(scaledKeypoints);
@@ -434,7 +441,7 @@ const drawSkeleton = () => {
     : null;
 
   // Define skeleton connections (COCO 17 format)
-  const connections = [
+  const connections: [number, number][] = [
     // Head
     [0, 1],
     [0, 2],
@@ -457,18 +464,20 @@ const drawSkeleton = () => {
     [14, 16],
   ];
 
-  const colors: Record<string, string> = {
+  const colors = {
     head: "#3399FF",
     torso: "#FF9933",
     arms: "#99FF33",
     legs: "#FF3399",
-  };
+  } as const;
 
   // Draw connections
   connections.forEach((connection, index) => {
     const [i, j] = connection;
     const point1 = mirroredKeypoints[i];
     const point2 = mirroredKeypoints[j];
+
+    if (!point1 || !point2) return;
 
     if (
       point1[0] >= 0 &&
@@ -498,6 +507,7 @@ const drawSkeleton = () => {
 
   // Draw keypoints
   mirroredKeypoints.forEach((point) => {
+    if (!point) return;
     if (
       point[0] >= 0 &&
       point[0] <= displayedWidth &&
@@ -513,21 +523,28 @@ const drawSkeleton = () => {
 
   // Draw angle lines if available
   if (mirroredAnglePoint && mirroredAnglePoint.length === 3) {
-    const angleInBounds = mirroredAnglePoint.every(
-      (p) =>
-        p[0] >= 0 &&
-        p[0] <= displayedWidth &&
-        p[1] >= 0 &&
-        p[1] <= displayedHeight
-    );
-    if (angleInBounds) {
-      ctx.strokeStyle = "#FFFF00";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.moveTo(mirroredAnglePoint[0][0], mirroredAnglePoint[0][1]);
-      ctx.lineTo(mirroredAnglePoint[1][0], mirroredAnglePoint[1][1]);
-      ctx.lineTo(mirroredAnglePoint[2][0], mirroredAnglePoint[2][1]);
-      ctx.stroke();
+    const p0 = mirroredAnglePoint[0];
+    const p1 = mirroredAnglePoint[1];
+    const p2 = mirroredAnglePoint[2];
+
+    if (p0 && p1 && p2) {
+      const angleInBounds =
+        p0[0] >= 0 && p0[0] <= displayedWidth &&
+        p0[1] >= 0 && p0[1] <= displayedHeight &&
+        p1[0] >= 0 && p1[0] <= displayedWidth &&
+        p1[1] >= 0 && p1[1] <= displayedHeight &&
+        p2[0] >= 0 && p2[0] <= displayedWidth &&
+        p2[1] >= 0 && p2[1] <= displayedHeight;
+
+      if (angleInBounds) {
+        ctx.strokeStyle = "#FFFF00";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(p0[0], p0[1]);
+        ctx.lineTo(p1[0], p1[1]);
+        ctx.lineTo(p2[0], p2[1]);
+        ctx.stroke();
+      }
     }
   }
 };
@@ -536,10 +553,10 @@ const handleSetComplete = () => {
   if (!currentExercise.value) return;
 
   if (currentSet.value < currentExercise.value.sets) {
-    // Переход к отдыху между сетами
-    startRest(30); // 30 секунд отдыха
+    // Transition to rest between sets
+    startRest(30); // 30 seconds rest
   } else {
-    // Упражнение завершено, переход к следующему
+    // Exercise complete, move to next
     moveToNextExercise();
   }
 };
@@ -547,6 +564,9 @@ const handleSetComplete = () => {
 const startRest = (seconds: number) => {
   isResting.value = true;
   restTimeLeft.value = seconds;
+
+  // Stop timed exercise timer during rest
+  stopTimedExerciseTimer();
 
   const restInterval = setInterval(() => {
     restTimeLeft.value--;
@@ -557,21 +577,12 @@ const startRest = (seconds: number) => {
       currentSet.value++;
       currentReps.value = 0;
       lastReps.value = 0;
+      timedExerciseSeconds.value = 0; // Reset timed exercise seconds
 
-      // Reset counter on backend
-      resetBackendCounter();
+      // Reset local counter
+      resetMediaPipeCounter();
     }
   }, 1000);
-};
-
-const resetBackendCounter = async () => {
-  try {
-    await fetch(`${config.public.apiUrl}/api/v1/vision/reset-counter`, {
-      method: "POST",
-    });
-  } catch (error) {
-    console.error("Failed to reset backend counter:", error);
-  }
 };
 
 const moveToNextExercise = () => {
@@ -584,19 +595,19 @@ const moveToNextExercise = () => {
   }
 
   if (currentExerciseIndex.value < props.exercises.length - 1) {
-    // Переход к следующему упражнению
+    // Transition to next exercise
     currentExerciseIndex.value++;
     currentSet.value = 1;
     currentReps.value = 0;
     lastReps.value = 0;
 
-    // Reset counter
-    resetBackendCounter();
+    // Reset local counter
+    resetMediaPipeCounter();
 
-    // Отдых между упражнениями
-    startRest(60); // 60 секунд отдыха
+    // Rest between exercises
+    startRest(60); // 60 seconds rest
   } else {
-    // Тренировка завершена
+    // Workout complete
     completeWorkout();
   }
 };
@@ -606,20 +617,15 @@ const completeWorkout = async () => {
   showingResults.value = true;
   saving.value = true;
 
-  // Stop sending frames
-  if (frameInterval) {
-    clearInterval(frameInterval);
-    frameInterval = null;
+  // Stop pose detection
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
   }
 
-  // Останавливаем камеру
+  // Stop camera
   if (stream.value) {
     stream.value.getTracks().forEach((track) => track.stop());
-  }
-
-  // Close WebSocket
-  if (ws.value) {
-    ws.value.close();
   }
 
   // Prepare workout data for persistence
@@ -660,7 +666,7 @@ const completeWorkout = async () => {
 
     console.log("Saving workout session...", workoutData);
     const response = (await saveWorkout(workoutData)) as any;
-    console.log("✓ Workout saved successfully:", response);
+    console.log("Workout saved successfully:", response);
 
     // Check for achievements
     if (response.new_achievements && response.new_achievements.length > 0) {
@@ -702,7 +708,7 @@ const completeWorkout = async () => {
       });
     }
   } catch (error) {
-    console.error("✗ Failed to save workout:", error);
+    console.error("Failed to save workout:", error);
     // We still show results to user, but log error
   } finally {
     saving.value = false;
@@ -716,31 +722,30 @@ const skipRest = () => {
 };
 
 const exitTraining = () => {
-  if (frameInterval) {
-    clearInterval(frameInterval);
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
   }
+  stopTimedExerciseTimer();
   if (stream.value) {
     stream.value.getTracks().forEach((track) => track.stop());
-  }
-  if (ws.value) {
-    ws.value.close();
   }
   emit("endTraining");
 };
 
-onMounted(() => {
-  initCamera();
+onMounted(async () => {
+  // Initialize MediaPipe first
+  await initializeMediaPipe();
+  // Then initialize camera
+  await initCamera();
 });
 
 onUnmounted(() => {
-  if (frameInterval) {
-    clearInterval(frameInterval);
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
   }
+  stopTimedExerciseTimer();
   if (stream.value) {
     stream.value.getTracks().forEach((track) => track.stop());
-  }
-  if (ws.value) {
-    ws.value.close();
   }
   window.removeEventListener("resize", updateCanvasSize);
 });
@@ -767,7 +772,7 @@ onUnmounted(() => {
 
       <!-- Form Corrections Display -->
       <div
-        v-if="formCorrections.length > 0"
+        v-if="displayedCorrections.length > 0"
         class="absolute top-32 left-0 right-0 px-6 z-10 animate-in fade-in slide-in-from-top-4 duration-300"
       >
         <div
@@ -779,22 +784,30 @@ onUnmounted(() => {
           </div>
           <ul class="space-y-1">
             <li
-              v-for="(correction, idx) in formCorrections"
+              v-for="(correction, idx) in displayedCorrections"
               :key="idx"
               class="text-white text-sm"
             >
-              • {{ correction }}
+              {{ correction }}
             </li>
           </ul>
         </div>
       </div>
 
-      <!-- Connection Status -->
+      <!-- Loading Status -->
       <div
-        v-if="!isConnected && isCameraReady"
+        v-if="mediaPipeLoading && isCameraReady"
+        class="absolute top-20 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-blue-500/90 backdrop-blur rounded-full text-white text-sm font-medium z-10"
+      >
+        Загрузка AI модели...
+      </div>
+
+      <!-- MediaPipe Error -->
+      <div
+        v-if="mediaPipeError && isCameraReady"
         class="absolute top-20 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-orange-500/90 backdrop-blur rounded-full text-white text-sm font-medium z-10"
       >
-        Подключение к серверу...
+        {{ mediaPipeError }}
       </div>
 
       <!-- Camera Error -->
@@ -874,25 +887,72 @@ onUnmounted(() => {
               {{ currentExercise.name }}
             </h2>
 
-            <!-- Rep Counter -->
-            <div class="text-7xl font-bold mb-4 leading-none">
-              <span class="text-neon">{{ currentReps }}</span>
-              <span class="text-white/40 text-5xl">/</span>
-              <span class="text-white">{{ currentExercise.reps }}</span>
-            </div>
-
-            <!-- Form Quality -->
-            <div class="flex items-center justify-center gap-3">
-              <div class="w-40 h-2 bg-white/10 rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-neon transition-all duration-300"
-                  :style="{ width: `${formQuality}%` }"
-                />
+            <!-- Timed Exercise (Plank) -->
+            <template v-if="isCurrentExerciseTimed">
+              <!-- Timer Display -->
+              <div class="text-7xl font-bold mb-4 leading-none">
+                <span :class="isInPosition ? 'text-neon' : 'text-white/50'">{{ timedExerciseSeconds }}</span>
+                <span class="text-white/40 text-5xl">/</span>
+                <span class="text-white">{{ currentExercise.reps }}</span>
+                <span class="text-2xl text-white/60 ml-2">сек</span>
               </div>
-              <span class="text-gray-400 text-sm font-medium"
-                >Форма: {{ formQuality }}%</span
-              >
-            </div>
+
+              <!-- Position Status -->
+              <div class="mb-4">
+                <div
+                  :class="[
+                    'inline-flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all',
+                    isInPosition
+                      ? 'bg-neon/20 text-neon'
+                      : 'bg-orange-500/20 text-orange-400'
+                  ]"
+                >
+                  <div
+                    :class="[
+                      'w-3 h-3 rounded-full',
+                      isInPosition ? 'bg-neon animate-pulse' : 'bg-orange-400'
+                    ]"
+                  />
+                  {{ isInPosition ? 'Держите позицию!' : 'Примите позицию планки' }}
+                </div>
+              </div>
+
+              <!-- Progress bar -->
+              <div class="flex items-center justify-center gap-3">
+                <div class="w-40 h-2 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    class="h-full bg-neon transition-all duration-300"
+                    :style="{ width: `${(timedExerciseSeconds / currentExercise.reps) * 100}%` }"
+                  />
+                </div>
+                <span class="text-gray-400 text-sm font-medium">
+                  {{ Math.round((timedExerciseSeconds / currentExercise.reps) * 100) }}%
+                </span>
+              </div>
+            </template>
+
+            <!-- Regular Exercise (Reps) -->
+            <template v-else>
+              <!-- Rep Counter -->
+              <div class="text-7xl font-bold mb-4 leading-none">
+                <span class="text-neon">{{ currentReps }}</span>
+                <span class="text-white/40 text-5xl">/</span>
+                <span class="text-white">{{ currentExercise.reps }}</span>
+              </div>
+
+              <!-- Form Quality -->
+              <div class="flex items-center justify-center gap-3">
+                <div class="w-40 h-2 bg-white/10 rounded-full overflow-hidden">
+                  <div
+                    class="h-full bg-neon transition-all duration-300"
+                    :style="{ width: `${formQuality}%` }"
+                  />
+                </div>
+                <span class="text-gray-400 text-sm font-medium"
+                  >Форма: {{ formQuality }}%</span
+                >
+              </div>
+            </template>
 
             <!-- Angle Display -->
             <div v-if="currentAngle" class="mt-3 text-gray-400 text-sm">
