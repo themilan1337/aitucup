@@ -47,9 +47,49 @@ if [ -z "$RESOLVED_IP" ]; then
 fi
 echo -e "${GREEN}✓ DNS resolves to: $RESOLVED_IP${NC}"
 
-# Stop Nginx temporarily
-echo -e "\n${YELLOW}Stopping Nginx temporarily...${NC}"
-systemctl stop nginx
+# Check what's using port 80
+echo -e "\n${YELLOW}Checking port 80...${NC}"
+PORT_80_PROCESS=$(lsof -ti :80 || true)
+
+if [ -n "$PORT_80_PROCESS" ]; then
+    echo -e "${YELLOW}Found processes using port 80:${NC}"
+    lsof -i :80 || true
+
+    # Stop Nginx if it's running
+    if systemctl is-active --quiet nginx; then
+        echo -e "${YELLOW}Stopping Nginx...${NC}"
+        systemctl stop nginx
+        sleep 2
+    fi
+
+    # Check again
+    PORT_80_PROCESS=$(lsof -ti :80 || true)
+    if [ -n "$PORT_80_PROCESS" ]; then
+        echo -e "${YELLOW}Other processes still using port 80:${NC}"
+        lsof -i :80 || true
+        echo -e "\n${RED}Please stop these processes manually:${NC}"
+        echo -e "  sudo kill $PORT_80_PROCESS"
+        echo -e "\nOr stop all processes on port 80:"
+        echo -e "  sudo fuser -k 80/tcp"
+        read -p "Stop all processes on port 80? (y/N): " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            fuser -k 80/tcp || true
+            sleep 2
+        else
+            exit 1
+        fi
+    fi
+else
+    # Stop Nginx if it's running
+    if systemctl is-active --quiet nginx; then
+        echo -e "${YELLOW}Stopping Nginx...${NC}"
+        systemctl stop nginx
+        sleep 2
+    fi
+fi
+
+echo -e "${GREEN}✓ Port 80 is now available${NC}"
 
 # Obtain SSL certificate using standalone mode
 echo -e "\n${YELLOW}Obtaining SSL certificate from Let's Encrypt...${NC}"
