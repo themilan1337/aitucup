@@ -1,23 +1,87 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useTrainingStore } from '~/stores/training'
+import { useAuthStore } from '~/stores/auth'
 import SectionTitle from '~/components/SectionTitle.vue'
 import WeeklyBarChart from '~/components/charts/WeeklyBarChart.vue'
 import AccuracyLineChart from '~/components/charts/AccuracyLineChart.vue'
 
 const store = useTrainingStore()
+const authStore = useAuthStore()
 
 const tabs = ['Неделя', 'Месяц', 'Всё время']
 const activeTab = ref('Неделя')
+const isLoading = ref(false)
+const currentPeriodStats = ref<any>(null)
 
-// Helper for records
-const recordsList = [
+// Map tab name to API period
+const periodMap: Record<string, 'week' | 'month' | 'all'> = {
+  'Неделя': 'week',
+  'Месяц': 'month',
+  'Всё время': 'all'
+}
+
+// Get user weight from auth store
+const userWeight = computed(() => authStore.user?.profile?.weight || 70.0)
+
+// Helper for records - computed to be reactive
+const recordsList = computed(() => [
   { name: 'Приседания', value: store.records.squats, unit: 'повт', icon: 'heroicons:bolt' },
   { name: 'Выпады', value: store.records.lunges, unit: 'повт', icon: 'heroicons:fire' },
   { name: 'Отжимания', value: store.records.pushups, unit: 'повт', icon: 'heroicons:user' },
   { name: 'Планка', value: store.records.plank, unit: 'сек', icon: 'heroicons:clock' },
-]
+])
+
+// Stats to display based on active period
+const displayStats = computed(() => {
+  if (!currentPeriodStats.value) {
+    return {
+      workouts: 0,
+      reps: 0,
+      minutes: 0,
+      calories: 0,
+      accuracy: 0
+    }
+  }
+
+  return {
+    workouts: currentPeriodStats.value.total_workouts,
+    reps: currentPeriodStats.value.total_reps,
+    minutes: currentPeriodStats.value.total_minutes,
+    calories: Math.round(currentPeriodStats.value.total_calories),
+    accuracy: Math.round(currentPeriodStats.value.average_accuracy * 100)
+  }
+})
+
+// Load stats for selected period
+const loadPeriodStats = async () => {
+  isLoading.value = true
+  try {
+    const period = periodMap[activeTab.value]
+    const { getDashboardStats } = useStats()
+    currentPeriodStats.value = await getDashboardStats(period)
+  } catch (error) {
+    console.error('Failed to load period stats:', error)
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Load all data on mount
+onMounted(async () => {
+  try {
+    await store.loadAllStats()
+    await loadPeriodStats()
+  } catch (error) {
+    console.error('Failed to load stats:', error)
+  }
+})
+
+// Watch for tab changes and reload stats
+watch(activeTab, () => {
+  loadPeriodStats()
+})
 </script>
 
 <template>
@@ -45,7 +109,7 @@ const recordsList = [
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
               <span>Тренировок</span>
            </div>
-           <p class="text-3xl font-bold">{{ store.lifetimeStats.totalWorkouts }}</p>
+           <p class="text-3xl font-bold">{{ displayStats.workouts }}</p>
         </div>
 
         <!-- Reps -->
@@ -53,7 +117,7 @@ const recordsList = [
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
               <span>Повторений</span>
            </div>
-           <p class="text-3xl font-bold">{{ store.lifetimeStats.totalReps }}</p>
+           <p class="text-3xl font-bold">{{ displayStats.reps }}</p>
         </div>
 
         <!-- Time -->
@@ -61,7 +125,7 @@ const recordsList = [
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
               <span>Время</span>
            </div>
-           <p class="text-3xl font-bold">{{ store.weeklyStats.minutes }} <span class="text-lg font-normal text-gray-500">мин</span></p>
+           <p class="text-3xl font-bold">{{ displayStats.minutes }} <span class="text-lg font-normal text-gray-500">мин</span></p>
         </div>
 
         <!-- Calories -->
@@ -69,15 +133,15 @@ const recordsList = [
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
               <span>Калорий</span>
            </div>
-           <p class="text-3xl font-bold">{{ store.weeklyStats.calories }} <span class="text-lg font-normal text-gray-500">ккал</span></p>
+           <p class="text-3xl font-bold">{{ displayStats.calories }} <span class="text-lg font-normal text-gray-500">ккал</span></p>
         </div>
-        
+
         <!-- Accuracy -->
         <div class="bg-card p-4 rounded-2xl bg-[#111]">
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
               <span>Точность формы</span>
            </div>
-           <p class="text-3xl font-bold">{{ store.lifetimeStats.avgAccuracy }}<span class="text-lg font-normal text-gray-500">%</span></p>
+           <p class="text-3xl font-bold">{{ displayStats.accuracy }}<span class="text-lg font-normal text-gray-500">%</span></p>
         </div>
 
           <!-- Weight -->
@@ -85,7 +149,7 @@ const recordsList = [
            <div class="flex items-center gap-2 mb-2 text-gray-400 text-sm">
               <span>Вес</span>
            </div>
-           <p class="text-3xl font-bold">70.0 <span class="text-lg font-normal text-gray-500">кг</span></p>
+           <p class="text-3xl font-bold">{{ userWeight }} <span class="text-lg font-normal text-gray-500">кг</span></p>
         </div>
      </div>
 
@@ -118,8 +182,8 @@ const recordsList = [
      <div class="mb-24">
         <SectionTitle title="Личные рекорды" icon="heroicons:trophy" />
         <div class="bg-[#111] rounded-2xl p-4">
-             <div 
-               v-for="(rec, i) in recordsList" 
+             <div
+               v-for="rec in recordsList"
                :key="rec.name"
                class="flex items-center justify-between py-3 border-b border-white/5 last:border-0"
              >
@@ -128,7 +192,7 @@ const recordsList = [
                    <span class="text-white">{{ rec.name }}</span>
                 </div>
                 <div class="font-bold text-xl">
-                   <span class="text-neon">{{ rec.value }}</span> 
+                   <span class="text-neon">{{ rec.value }}</span>
                    <span class="text-sm text-gray-500 font-normal ml-1">{{ rec.unit }}</span>
                 </div>
              </div>
