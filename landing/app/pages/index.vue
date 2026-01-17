@@ -67,6 +67,60 @@ const benefits = [
     description: 'Отслеживайте улучшения каждый день',
   },
 ]
+
+const team = [
+  {
+    name: 'Sultan Karilov',
+    role: 'AI Engineer & Founder',
+    avatar: '👨‍💼',
+    education: 'MBZUAI, выпуск 2030',
+    experience: 'AI Engineer @ Zimran, основал Runvex (1000+ пользователей), выпускник nFactorial Incubator',
+    responsibilities: [
+      'Определяет стратегию развития продукта',
+      'Отвечает за ИИ-модели и персонализацию тренировок',
+      'Финансы и управление компанией',
+      'Контроль ресурсов и планирование развития'
+    ],
+    social: {
+      linkedin: 'https://linkedin.com/in/sultankarilov',
+      github: 'https://github.com/sultankarilov'
+    }
+  },
+  {
+    name: 'Bizhan Ashyhatov',
+    role: 'iOS & AI Engineer',
+    avatar: '👨‍💻',
+    education: 'AITU, 2 курс',
+    experience: 'Основатель AuarAI (приобретена), CO-CEO в BachOpus, приложения с аудиторией 50k+, выпускник nFactorial Incubator',
+    responsibilities: [
+      'Разработка iOS-приложения',
+      'Интеграция ИИ-моделей',
+      'Обеспечение стабильной работы на мобильных устройствах',
+      'Маркетинг и управление продвижением продукта'
+    ],
+    social: {
+      linkedin: 'https://linkedin.com/in/bizhanashyhatov',
+      github: 'https://github.com/bizhan'
+    }
+  },
+  {
+    name: 'Milan Gorislavetz',
+    role: 'Fullstack Engineer',
+    avatar: '🧑‍💻',
+    education: 'Выпускник Seitzhan School',
+    experience: 'Основатель SereneAI, CatOps, fckvibecode, ведущий frontend инженер',
+    responsibilities: [
+      'Разработка фронтенда и бэкенда',
+      'Интеграция базы данных и облачных сервисов',
+      'Дизайн и креативные материалы',
+      'UI/UX, визуальная коммуникация и контент для продвижения'
+    ],
+    social: {
+      linkedin: 'https://linkedin.com/in/milangorislavetz',
+      github: 'https://github.com/milan'
+    }
+  }
+]
 </script>
 
 <template>
@@ -242,6 +296,110 @@ const benefits = [
                 <p class="text-gray-400 text-lg leading-relaxed">{{ benefit.description }}</p>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Team Section -->
+    <section class="team-section py-32 relative">
+      <!-- Background Effect -->
+      <div class="absolute inset-0 bg-gradient-to-b from-neon/5 via-transparent to-neon/5"></div>
+
+      <div class="container mx-auto px-6 relative z-10">
+        <div class="text-center mb-16 space-y-4">
+          <h2 class="text-4xl md:text-6xl font-bold">
+            Команда <span class="text-neon">MuscleUp</span>
+          </h2>
+          <p class="text-xl text-gray-400 max-w-3xl mx-auto">
+            Успех MuscleUp обеспечивается опытной командой специалистов с сильным бэкграундом в ИИ, мобильной разработке и стартапах
+          </p>
+        </div>
+
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-7xl mx-auto">
+          <div
+            v-for="(member, index) in team"
+            :key="index"
+            class="team-card group bg-gradient-to-br from-card to-card-hover rounded-3xl p-8 border border-white/5 hover:border-neon/50 transition-all duration-300 hover:shadow-neon-card"
+          >
+            <!-- Avatar & Role -->
+            <div class="text-center mb-6">
+              <div class="w-24 h-24 mx-auto mb-4 rounded-2xl bg-neon/10 flex items-center justify-center text-5xl group-hover:bg-neon/20 transition-all duration-300">
+                {{ member.avatar }}
+              </div>
+              <h3 class="text-2xl font-bold mb-1">{{ member.name }}</h3>
+              <p class="text-neon font-semibold text-sm">{{ member.role }}</p>
+            </div>
+
+            <!-- Education & Experience -->
+            <div class="space-y-4 mb-6">
+              <div class="space-y-2">
+                <div class="flex items-start gap-2">
+                  <Icon icon="hugeicons:mortarboard-02" class="text-neon text-lg mt-0.5 flex-shrink-0" />
+                  <p class="text-sm text-gray-400">{{ member.education }}</p>
+                </div>
+                <div class="flex items-start gap-2">
+                  <Icon icon="hugeicons:briefcase-02" class="text-neon text-lg mt-0.5 flex-shrink-0" />
+                  <p class="text-sm text-gray-400">{{ member.experience }}</p>
+                </div>
+              </div>
+
+              <!-- Responsibilities -->
+              <div class="space-y-2">
+                <div class="flex items-center gap-2 mb-2">
+                  <Icon icon="hugeicons:check-list" class="text-neon text-lg" />
+                  <span class="text-xs font-semibold text-gray-500 uppercase">Роль в проекте</span>
+                </div>
+                <ul class="space-y-1.5 ml-6">
+                  <li v-for="(resp, idx) in member.responsibilities" :key="idx" class="text-xs text-gray-400 flex items-start gap-2">
+                    <span class="text-neon mt-1">•</span>
+                    <span>{{ resp }}</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Social Links -->
+            <div class="flex gap-3 pt-4 border-t border-white/5">
+              <a
+                v-if="member.social.linkedin"
+                :href="member.social.linkedin"
+                target="_blank"
+                class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-white/5 hover:bg-neon/10 rounded-xl transition-all duration-300 text-sm"
+              >
+                <Icon icon="hugeicons:linkedin-02" class="text-lg" />
+                <span>LinkedIn</span>
+              </a>
+              <a
+                v-if="member.social.github"
+                :href="member.social.github"
+                target="_blank"
+                class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-white/5 hover:bg-neon/10 rounded-xl transition-all duration-300 text-sm"
+              >
+                <Icon icon="hugeicons:github" class="text-lg" />
+                <span>GitHub</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Team Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto mt-16">
+          <div class="text-center p-6 bg-card rounded-2xl border border-white/5">
+            <div class="text-3xl font-bold text-neon mb-2">3</div>
+            <div class="text-sm text-gray-400">Члена команды</div>
+          </div>
+          <div class="text-center p-6 bg-card rounded-2xl border border-white/5">
+            <div class="text-3xl font-bold text-neon mb-2">50k+</div>
+            <div class="text-sm text-gray-400">Пользователей</div>
+          </div>
+          <div class="text-center p-6 bg-card rounded-2xl border border-white/5">
+            <div class="text-3xl font-bold text-neon mb-2">5+</div>
+            <div class="text-sm text-gray-400">Проектов запущено</div>
+          </div>
+          <div class="text-center p-6 bg-card rounded-2xl border border-white/5">
+            <div class="text-3xl font-bold text-neon mb-2">100%</div>
+            <div class="text-sm text-gray-400">Преданность делу</div>
           </div>
         </div>
       </div>
